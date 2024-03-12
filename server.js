@@ -481,7 +481,7 @@ app.post('/insertar-datossss', async (req, res) => {
   }
 });
 
-app.get('/api/plantel', async (req, res) => {
+app.get('/plantel', async (req, res) => {
   try {
     const query = 'SELECT id, nombre FROM plantel';
     const connection = await req.mysqlPool.getConnection();
@@ -498,7 +498,7 @@ app.get('/api/plantel', async (req, res) => {
   }
 });
 
-app.get('/api/sesiones', async (req, res) => {
+app.get('/sesiones', async (req, res) => {
   try {
     const query = 'SELECT id, tipo_sesion FROM sesion';
     const connection = await req.mysqlPool.getConnection();
