@@ -59,17 +59,22 @@ app.post('/guardarAgenda', async (req, res) => {
   let connection;
 
   try {
-    const { titulo, descripcion, asignacion, fecha, hora } = req.body; 
+    // Mostrar cada dato individualmente
+    console.log('Datos recibidos para la agenda - Título:', req.body.titulo);
+    console.log('Descripción:', req.body.descripcion);
+    console.log('Asignación:', req.body.asignacion);
+    console.log('Fecha:', req.body.fecha);
+    console.log('Hora:', req.body.hora);
 
-    console.log('Titulo recibido:', titulo);
-    console.log('Descripcion recibida:', descripcion);
-    console.log('Asignacion recibida:', asignacion);
-    console.log('Fecha recibida:', fecha);
-    console.log('Hora recibida:', hora);
+    // Asignación de valores para la consulta SQL
+    const titulo = req.body.titulo;
+    const descripcion = req.body.descripcion;
+    const asignacion = req.body.asignacion;
+    const fecha = req.body.fecha;
+    const hora = req.body.hora;
 
-   
     connection = await req.mysqlPool.getConnection();
-    const query ='INSERT INTO agenda ( titulo, descripcion, tipo_asig, fecha_sol, hora_sol, fecha_creacion) VALUES (?,?,?,?,?, NOW())'; 
+    const query = 'INSERT INTO agenda (titulo, descripcion, tipo_asig, fecha_sol, hora_sol, fecha_creacion) VALUES (?,?,?,?,?, NOW())'; 
     await connection.query(query, [titulo, descripcion, asignacion, fecha, hora]);
     console.log('Datos insertados correctamente a la agenda'); 
     res.json({ success: true, message: 'Datos insertados correctamente a la agenda' });
@@ -82,6 +87,7 @@ app.post('/guardarAgenda', async (req, res) => {
     }
   }
 });
+
 
 
  
