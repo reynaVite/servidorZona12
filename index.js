@@ -59,8 +59,15 @@ app.post('/guardarAgenda', async (req, res) => {
   let connection;
 
   try {
-    const { titulo, descripcion, asignacion, fecha, hora } = req.body;
-    console.log('Datos recibidos para la agenda:', { titulo, descripcion, asignacion, fecha, hora });
+    const { titulo, descripcion, asignacion, fecha, hora } = req.body; 
+
+    console.log('Titulo recibido:', titulo);
+    console.log('Descripcion recibida:', descripcion);
+    console.log('Asignacion recibida:', asignacion);
+    console.log('Fecha recibida:', fecha);
+    console.log('Hora recibida:', hora);
+
+   
     connection = await req.mysqlPool.getConnection();
     const query ='INSERT INTO agenda ( titulo, descripcion, tipo_asig, fecha_sol, hora_sol, fecha_creacion) VALUES (?,?,?,?,?, NOW())'; 
     await connection.query(query, [titulo, descripcion, asignacion, fecha, hora]);
