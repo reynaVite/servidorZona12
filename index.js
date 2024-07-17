@@ -55,45 +55,30 @@ app.get('/consultarActividades', async (req, res) => {
  
 
 
+
 app.post('/guardarAgenda', async (req, res) => {
   let connection;
 
   try {
     const { titulo, descripcion, asignacion, fecha, hora } = req.body;
-
-    // Validación de campos requeridos
-    if (!titulo) {
-      return res.status(400).json({ success: false, message: 'El campo "titulo" es requerido.' });
-    }
-    if (!descripcion) {
-      return res.status(400).json({ success: false, message: 'El campo "descripcion" es requerido.' });
-    }
-    if (!asignacion) {
-      return res.status(400).json({ success: false, message: 'El campo "asignacion" es requerido.' });
-    }
-    if (!fecha) {
-      return res.status(400).json({ success: false, message: 'El campo "fecha" es requerido.' });
-    }
-    if (!hora) {
-      return res.status(400).json({ success: false, message: 'El campo "hora" es requerido.' });
-    }
-
     console.log('Datos recibidos para la agenda:', { titulo, descripcion, asignacion, fecha, hora });
     connection = await req.mysqlPool.getConnection();
-    const query = 'INSERT INTO agenda (titulo, descripcion, tipo_asig, fecha_sol, hora_sol, fecha_creacion) VALUES (?, ?, ?, ?, ?, NOW())';
+    const query ='INSERT INTO agenda ( titulo, descripcion, tipo_asig, fecha_sol, hora_sol, fecha_creacion) VALUES (?,?,?,?,?, NOW())'; 
     await connection.query(query, [titulo, descripcion, asignacion, fecha, hora]);
-    console.log('Datos insertados correctamente a la agenda');
+    console.log('Datos insertados correctamente a la agenda'); 
     res.json({ success: true, message: 'Datos insertados correctamente a la agenda' });
   } catch (error) {
     console.error('Error al procesar la solicitud: ', error);
     res.status(500).json({ success: false, message: 'Error al procesar la solicitud' });
   } finally {
     if (connection) {
-      connection.release();
+      connection.release(); 
     }
   }
 });
 
+
+ 
 
 
  
