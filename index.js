@@ -60,14 +60,13 @@ app.post('/guardarAgenda', async (req, res) => {
   let connection;
 
   try {
-    const { titulo, descripcion, asignacion, fecha, hora } = req.body;
+    const { descripcion, asignacion, fecha, hora } = req.body;
    console.log(req.body);
 
    
-    console.log('Datos recibidos para la agenda:', { titulo, descripcion, asignacion, fecha, hora });
     connection = await req.mysqlPool.getConnection();
-    const query ='INSERT INTO agenda ( titulo, descripcion, tipo_asig, fecha_sol, hora_sol, fecha_creacion) VALUES (?,?,?,?,?, NOW())'; 
-    await connection.query(query, [titulo, descripcion, asignacion, fecha, hora]);
+    const query ='INSERT INTO agenda ( descripcion, tipo_asig, fecha_sol, hora_sol, fecha_creacion) VALUES (?,?,?,?, NOW())'; 
+    await connection.query(query, [descripcion, asignacion, fecha, hora]);
     console.log('Datos insertados correctamente a la agenda'); 
     res.json({ success: true, message: 'Datos insertados correctamente a la agenda' });
   } catch (error) {
