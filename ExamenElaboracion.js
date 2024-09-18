@@ -5,7 +5,7 @@ const path = require('path');
 const { fromBuffer } = require('file-type');
 const fs = require('fs');
 
- 
+//obtener materias 
 ExamenElaboracion.get('/getMaterias', async (req, res) => {
     let connection;
     try {
