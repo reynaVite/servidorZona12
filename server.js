@@ -1,7 +1,10 @@
 const express = require('express');
 const helmet = require('helmet');
 const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({ dest: 'uploads/' },{ storage: multer.memoryStorage() });
+const path = require('path'); 
+const fs = require('fs');
+const util = require('util'); 
 const bcrypt = require('bcrypt');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
@@ -16,7 +19,19 @@ app.use(cors());
 app.use(express.json());
 app.use(bodyParser.json());
 app.use(helmet());
-const moment = require('moment');
+const moment = require('moment'); 
+const routes = require('./routes');  
+
+
+const inicioSesion = require('./inicioSesion'); 
+const RecuperarContrasena = require('./RecuperarContrasena'); 
+const PreRegistro = require('./PreRegistro'); 
+const RegistroFinal = require('./RegistroFinal');
+const usuariosAdmin = require('./usuariosAdmin');
+const AsignarAgenda = require('./AsignarAgenda');
+const AgendaEntregados = require('./AgendaEntregados');
+const ExamenElaboracion = require('./ExamenElaboracion'); 
+const Foro = require('./Foro'); 
 
 //Política de CSP: Solo scripts internos
 app.use(
@@ -29,6 +44,7 @@ app.use(
 );
 
 // Configuración de la conexión a la base de datos
+/*
 const pool = mysql.createPool({
   host: '162.241.62.202',
   user: 'eduzonac_adminZona',
@@ -38,12 +54,44 @@ const pool = mysql.createPool({
   connectionLimit: 100,
   queueLimit: 0
 });
+*/
+
+
+const pool = mysql.createPool({
+  host: 'localhost',
+  user: 'root',
+  password: '',
+  database: 'eduzonac_adminzona',
+  waitForConnections: true,
+  connectionLimit: 100,
+  queueLimit: 0
+});
+
+
+
+ 
+
+module.exports = pool;
 
 // Middleware para adjuntar el pool de MySQL a cada solicitud
 app.use((req, res, next) => {
   req.mysqlPool = pool;
   next();
 });
+
+
+// Rutas
+app.use(routes);
+app.use(inicioSesion);
+app.use(RecuperarContrasena);
+app.use(PreRegistro);
+app.use(RegistroFinal);
+app.use(usuariosAdmin);
+app.use(AsignarAgenda);
+app.use(AgendaEntregados);
+app.use(ExamenElaboracion);
+app.use(Foro);
+
 
 app.get('/conexionBaseDatos', async (req, res) => {
   try {
@@ -57,117 +105,8 @@ app.get('/conexionBaseDatos', async (req, res) => {
   }
 });
 
-
-const enviarTokenYCorreo = async (correo, nombre, token) => {
-  const config = {
-    host: 'smtp.gmail.com',
-    port: 587,
-    auth: {
-      user: 'zona012huazalingo@gmail.com',
-      pass: 'kkcw ofwd qeon cpvr'
-    },
-    tls: {
-      rejectUnauthorized: false // Ignora la verificación del certificado
-    }
-  };
-  const mensaje = {
-    from: 'EduZona012 <zona012huazalingo@gmail.com>',
-    to: correo,
-    subject: 'Código de recuperación de contraseña - EduZona012',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background-color: #00314A; padding: 20px;">
-      <img src="https://eduzona.com.mx/logo.png" alt="EduZona012 Logo" style="max-width: 100px; max-height: 100px;">
-    </div>
-        <div style="background-color: #fff; padding: 20px;">
-          <h3 style="margin-bottom: 20px;">Hola ${nombre},</h3>
-          <p>Has solicitado restablecer tu contraseña en EduZona012. El código de recuperación que se proporciona tiene una duración de 10 minutos:</p>
-          <div style="display: flex; align-items: center; margin-bottom: 20px;">
-            <strong style="flex: 1;">${token}</strong>
-          </div>
-          <p>Por favor, úsalo dentro de los próximos 10 minutos para restablecer tu contraseña.</p>
-          <p>Si no has solicitado esta recuperación de contraseña, por favor ignora este mensaje.</p>
-        </div>
-        <div style="background-color: #00314A; padding: 20px; text-align: center;">
-          <p style="margin-bottom: 0; color: #fff;">© 2024 EduZona012. Todos los derechos reservados.</p>
-        </div>
-      </div>
-    `
-  };
-  const transport = nodemailer.createTransport(config);
-  try {
-    const info = await transport.sendMail(mensaje);
-    console.log('Correo electrónico enviado:', info);
-  } catch (error) {
-    console.error('Error al enviar el correo:', error);
-    throw error;
-  }
-};
-
-//YAAA
-app.post('/generar-token-y-enviar-correo', async (req, res) => {
-  const { curp } = req.body;
-  let connection;
-  try {
-    const token = uuid.v4(); // Generar un token único utilizando UUID
-    console.log('Token generado:', token);
-    connection = await req.mysqlPool.getConnection();
-    const emailQuery = `SELECT correo, nombre FROM registro WHERE curp = ?`; // Obtener el correo asociado a la CURP desde la base de datos
-    const [rows] = await connection.query(emailQuery, [curp]);
-    const { correo, nombre } = rows[0];
-    const updateTokenQuery = `UPDATE registro SET token = ?, fecha_envio = NOW() WHERE curp = ?`;
-    await connection.query(updateTokenQuery, [token, curp]);
-    await enviarTokenYCorreo(correo, nombre, token);
-    console.log('Token generado y enviado por correo');
-    // Programar la eliminación del token después de 10 minutos
-    setTimeout(async () => {
-      try {
-        const deleteTokenQuery = `UPDATE registro SET token = NULL WHERE curp = ?`;
-        await req.mysqlPool.query(deleteTokenQuery, [curp]);
-        console.log('Token eliminado después de 10 minutos');
-      } catch (error) {
-        console.error('Error al eliminar el token después de 10 minutos:', error);
-      }
-    }, 10 * 60 * 1000);
-    res.json({ token });
-  } catch (error) {
-    console.error('Error al generar y enviar el token:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-//YAAAA
-app.get('/registrosB', async (req, res) => {
-  let connection;
-  try {
-    const query = `
-      SELECT registro.*, 
-             plantel.nombre AS nombre_plantel, 
-             sesion.tipo_sesion AS tipo_sesion, 
-             estado_cuenta.estado_cuenta AS estado_cuenta, 
-             estado_usuario.estado_usuario AS estado_usuario
-      FROM registro
-      JOIN plantel ON registro.plantel = plantel.id
-      JOIN sesion ON registro.sesion = sesion.id
-      JOIN estado_cuenta ON registro.estado_cuenta = estado_cuenta.id
-      JOIN estado_usuario ON registro.estado_usuario = estado_usuario.id;
-    `;
-    connection = await req.mysqlPool.getConnection();
-    const [results] = await connection.execute(query);
-    res.json(results);
-  } catch (error) {
-    console.error('Error al obtener registros:', error);
-    res.status(500).json({ error: 'Error al obtener registros' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
+ 
+ 
 
 //YAAA
 app.get('/registroSol', async (req, res) => {
@@ -389,178 +328,9 @@ app.get('/registroSolAcep', async (req, res) => {
 });
 
 
-const enviarMailBaja = async (correo, nombre) => {
-  const config = {
-    host: 'smtp.gmail.com',
-    port: 587,
-    auth: {
-      user: 'zona012huazalingo@gmail.com',
-      pass: 'kkcw ofwd qeon cpvr'
-    },
-    tls: {
-      rejectUnauthorized: false
-    }
-  };
-  const mensaje = {
-    from: 'EduZona012 <zona012huazalingo@gmail.com>',
-    to: correo,
-    subject: 'Aviso de baja del sistema EduZona012',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #00314A; padding: 20px;">
-          <img src="https://eduzona.com.mx/logo.png" alt="EduZona012 Logo" style="max-width: 100px; max-height: 100px;">
-        </div>
-        
-        <div style="background-color: #fff; padding: 20px;">
-          <h3 style="margin-bottom: 20px;">Estimad@ ${nombre},</h3>
-          <p>Le informamos que su cuenta en el sistema EduZona012 ha sido dada de baja.</p>
-          <p>Si considera que esto es un error, por favor, consulte con su superior.</p>
-        </div>
-        <div style="background-color: #00314A; padding: 20px; text-align: center;">
-          <p style="margin-bottom: 0; color: #fff;">© 2024 EduZona012. Todos los derechos reservados.</p>
-        </div>
-      </div>
-    `
-  };
-  const transport = nodemailer.createTransport(config);
-  const info = await transport.sendMail(mensaje);
-  console.log(info);
-};
+ 
 
-//YAAA
-app.get('/registroBaja', async (req, res) => {
-  let connection;
-  try {
-    const curp = req.query.curp;
-    const ipAddress = req.ip.includes('::1') ? '127.0.0.1' : req.ip.replace(/^.*:/, '');
-    console.log('Datos de baja  backend:', { curp, ipAddress });
-
-    connection = await req.mysqlPool.getConnection();
-
-    await connection.execute(`
-      UPDATE registro
-      SET estado_cuenta = 2, estado_usuario = 2
-      WHERE curp = ?
-    `, [curp]); // Actualizar los campos estado_cuenta y estado_usuario a 2
-
-    const [result] = await connection.execute(`
-      SELECT correo, nombre FROM registro WHERE curp = ?
-    `, [curp]); // Obtener el correo del registro
-
-    if (result.length === 0) {
-      return res.status(404).json({ error: 'No se encontraron registros para la CURP proporcionada' });
-    }
-
-    const insertQuery = 'INSERT INTO logs_BajaUser (IP, fecha_hora, curp, descripcion) VALUES (?, NOW(), ?, ?)';
-    await connection.execute(insertQuery, [ipAddress, curp, 'Se eliminó el acceso de un usuario del sistema']);
-
-    const { correo, nombre } = result[0];
-
-    try {
-      await enviarMailBaja(correo, nombre);
-    } catch (mailError) {
-      console.error('Error al enviar el correo:', mailError);
-    }
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error al obtener registros:', error);
-    res.status(500).json({ error: 'Error al obtener registros' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-
-
-const enviarMailActivar = async (correo, nombre) => {
-  const config = {
-    host: 'smtp.gmail.com',
-    port: 587,
-    auth: {
-      user: 'zona012huazalingo@gmail.com',
-      pass: 'kkcw ofwd qeon cpvr'
-    },
-    tls: {
-      rejectUnauthorized: false
-    }
-  };
-  const mensaje = {
-    from: 'EduZona012 <zona012huazalingo@gmail.com>',
-    to: correo,
-    subject: 'Cuenta reactivada en el sistema EduZona012',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #00314A; padding: 20px;">
-          <img src="https://eduzona.com.mx/logo.png" alt="EduZona012 Logo" style="max-width: 100px; max-height: 100px;">
-        </div>
-        
-        <div style="background-color: #fff; padding: 20px;">
-          <h3 style="margin-bottom: 20px;">Estimad@ ${nombre},</h3>
-          <p>Le informamos que su cuenta en el sistema EduZona012 ha sido reactivada.</p>
-          <p>Ahora puede iniciar sesión nuevamente con sus credenciales.</p>
-        </div>
-        <div style="background-color: #00314A; padding: 20px; text-align: center;">
-          <p style="margin-bottom: 0; color: #fff;">© 2024 EduZona012. Todos los derechos reservados.</p>
-        </div>
-      </div>
-    `
-  };
-  const transport = nodemailer.createTransport(config);
-  const info = await transport.sendMail(mensaje);
-  console.log(info);
-};
-
-//YAAAA
-app.get('/registroActivar', async (req, res) => {
-  let connection;
-  try {
-    const curp = req.query.curp;
-    const ipAddress = req.ip.includes('::1') ? '127.0.0.1' : req.ip.replace(/^.*:/, '');
-    console.log('Datos de inicio de sesión recibidos en el backend:', { curp, ipAddress });
-
-    connection = await req.mysqlPool.getConnection();
-
-    await connection.execute(`
-      UPDATE registro
-      SET estado_cuenta = 1, estado_usuario = 1
-      WHERE curp = ?
-    `, [curp]); // Actualizar los campos estado_cuenta y estado_usuario a 2
-
-    const [result] = await connection.execute(`
-      SELECT correo, nombre
-      FROM registro
-      WHERE curp = ?
-    `, [curp]); // Obtener el correo del registro
-
-    if (result.length === 0) {
-      return res.status(404).json({ error: 'No se encontraron registros para la CURP proporcionada' });
-    }
-
-    const insertQuery = 'INSERT INTO logs_BajaUser (IP, fecha_hora, curp, descripcion) VALUES (?, NOW(), ?, ?)';
-    await connection.execute(insertQuery, [ipAddress, curp, 'Se reactivó el acceso de un usuario del sistema']);
-
-    const { correo, nombre } = result[0];
-
-    try {
-      await enviarMailActivar(correo, nombre);
-    } catch (mailError) {
-      console.error('Error al enviar el correo:', mailError);
-    }
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error al obtener registros:', error);
-    res.status(500).json({ error: 'Error al obtener registros' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
+ 
 //YAAAAA
 app.post('/insertar-datossss', async (req, res) => {
   let connection;
@@ -579,186 +349,15 @@ app.post('/insertar-datossss', async (req, res) => {
   }
 });
 
-//YAAAA
-app.get('/plantel', async (req, res) => {
-  let connection;
-  try {
-    const query = 'SELECT id, nombre FROM plantel';
-    connection = await req.mysqlPool.getConnection();
-    const [results] = await connection.execute(query);
-    const options = results.map(result => ({
-      value: result.id,
-      label: result.nombre
-    }));
-    res.json(options);
-  } catch (error) {
-    console.error('Error al obtener datos del plantel:', error);
-    res.status(500).json({ error: 'Error al obtener datos del plantel' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
+ 
 
-//YAAA
-app.get('/sesiones', async (req, res) => {
-  let connection;
-  try {
-    const query = 'SELECT id, tipo_sesion FROM sesion';
-    connection = await req.mysqlPool.getConnection();
-    const [results] = await connection.execute(query);
-    const options = results.map(result => ({
-      value: result.id,
-      label: result.tipo_sesion
-    }));
-    res.json(options);
-  } catch (error) {
-    console.error('Error al obtener datos de sesiones:', error);
-    res.status(500).json({ error: 'Error al obtener datos de sesiones' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
+ 
 
 
-//YAAA
-app.get('/preguntas-secretas', async (req, res) => {
-  let connection;
-  try {
-    const query = 'SELECT id, tipo_pregunta FROM pregunta';
-    connection = await req.mysqlPool.getConnection();
-    const [results] = await connection.execute(query);
-    const options = results.map(result => ({
-      value: result.id,
-      label: result.tipo_pregunta
-    }));
-    res.json(options);
-  } catch (error) {
-    console.error('Error al obtener datos de preguntas secretas:', error);
-    res.status(500).json({ error: 'Error al obtener datos de preguntas secretas' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-//YAAAA
-app.post('/verificar-correo', async (req, res) => {
-  let connection;
-  try {
-    const { correo } = req.body;
-    connection = await req.mysqlPool.getConnection();
-    const query = 'SELECT COUNT(*) as count FROM registro WHERE correo = ?';
-    const [results] = await connection.execute(query, [correo]);
-    const exists = results[0].count > 0;
-    res.json({ exists });
-  } catch (error) {
-    console.error('Error al verificar la existencia del correo en la base de datos:', error);
-    res.status(500).json({ error: 'Error al verificar la existencia del correo en la base de datos' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-//YAAAAAAAAAAAAA
-app.post('/verificar-correoSoli', async (req, res) => {
-  let connection;
-  try {
-    const { correo } = req.body;
-    connection = await req.mysqlPool.getConnection();
-    const query = 'SELECT COUNT(*) as count FROM registrosoli WHERE correo = ?';
-    const [results] = await connection.execute(query, [correo]);
-    const exists = results[0].count > 0;
-    res.json({ exists });
-  } catch (error) {
-    console.error('Error al verificar la existencia del correo en la base de datos:', error);
-    res.status(500).json({ error: 'Error al verificar la existencia del correo en la base de datos' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-//YAAAA
-app.post('/verificar-curpSoli', async (req, res) => {
-  let connection;
-  try {
-    const { curp } = req.body;
-    connection = await req.mysqlPool.getConnection();
-    const query = 'SELECT COUNT(*) as count FROM registrosoli WHERE curp = ?';
-    const [results] = await connection.execute(query, [curp]);
-    const exists = results[0].count > 0;
-    res.json({ exists });
-  } catch (error) {
-    console.error('Error al verificar la existencia de la CURP en la base de datos:', error);
-    res.status(500).json({ error: 'Error al verificar la existencia de la CURP en la base de datos' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-//YAAAAAAAAAAAAA
-app.post('/verificar-curp', async (req, res) => {
-  let connection;
-  try {
-    const { curp } = req.body;
-    connection = await req.mysqlPool.getConnection();
-    const query = 'SELECT COUNT(*) as count, estado_usuario FROM registro WHERE curp = ?';
-    const [results] = await connection.execute(query, [curp]);
-    if (results.length > 0) {
-      const exists = results[0].count > 0;
-      const estadoUsuario = results[0].estado_usuario;
-      if (estadoUsuario === 2) {
-        res.json({ exists, usuarioDeBaja: true });
-      } else {
-        res.json({ exists, usuarioDeBaja: false });
-      }
-    } else {
-      res.json({ exists: false, usuarioDeBaja: false });
-    }
-  } catch (error) {
-    console.error('Error al verificar la existencia de la CURP en la base de datos:', error);
-    res.status(500).json({ error: 'Error al verificar la existencia de la CURP en la base de datos' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-//YA
-app.post('/verificar-curp-contra', async (req, res) => {
-  let connection;
-  try {
-    const { curp } = req.body;
-    connection = await req.mysqlPool.getConnection();
-    const query = 'SELECT COUNT(*) as count, contrasena FROM registro WHERE curp = ?';
-    const [results] = await connection.execute(query, [curp]);
-    if (results.length === 0) {
-      res.json({ exists: false, emptyPassword: false });
-    } else {
-      const exists = results[0].count > 0;
-      const emptyPassword = results[0].contrasena ? false : true;
-      res.json({ exists, emptyPassword });
-    }
-  } catch (error) {
-    console.error('Error al verificar la existencia de la CURP en la base de datos:', error);
-    res.status(500).json({ error: 'Error al verificar la existencia de la CURP en la base de datos' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
+ 
+ 
+ 
+ 
 
 
 const enviarMailBloAdmin = async (curp, plantel, sesion, nombre, aPaterno, aMaterno, correo) => {
@@ -829,356 +428,7 @@ const enviarMailBloClie = async (correo, nombre) => {
   console.log(info);
 };
 
-//YAAAAAAA
-app.post('/updateEstadoCuenta', async (req, res) => {
-  let connection;
-  try {
-    const { curp } = req.body;
-    const ipAddress = req.ip.includes('::1') ? '127.0.0.1' : req.ip.replace(/^.*:/, ''); // Extraer la IP del cliente
-    console.log('Datos de inicio de sesión recibidos en el backend:', { curp, ipAddress }); // Mostrar los datos en consola
-    connection = await req.mysqlPool.getConnection();
-    const usuarioQuery = `
-      SELECT curp, plantel, sesion, nombre, aPaterno, aMaterno, correo
-      FROM registro
-      WHERE curp = ?
-    `;
-    const [usuarioResult] = await connection.execute(usuarioQuery, [curp]);
-    if (usuarioResult.length > 0) {
-      const { curp, plantel, sesion, nombre, aPaterno, aMaterno, correo } = usuarioResult[0];
-      const updateQuery = `
-        UPDATE registro
-        SET estado_cuenta = 2
-        WHERE curp = ?
-      `;
-      await connection.execute(updateQuery, [curp]);
-      res.status(200).send('Actualización exitosa del estado de cuenta a 2');
-      const insertQuery = 'INSERT INTO logs_bloqueoIni (IP, fecha_hora, curp) VALUES (?, NOW(), ?)';
-      await connection.execute(insertQuery, [ipAddress, curp]);
-      // Enviar correo al administrador con los datos extraídos
-      await enviarMailBloAdmin(curp, plantel, sesion, nombre, aPaterno, aMaterno, correo);
-      // Enviar correo al usuario bloqueado
-      await enviarMailBloClie(correo, nombre);
-    } else {
-      res.status(404).send('No se encontró al usuario para la CURP especificada');
-    }
-  } catch (error) {
-    console.error('Error al procesar la solicitud:', error);
-    res.status(500).send('Error al procesar la solicitud');
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-const enviarMail = async (curp, plantel, sesion, nombre, aPaterno, aMaterno, correo) => {
-  const config = {
-    host: 'smtp.gmail.com',
-    port: 587,
-    auth: {
-      user: 'zona012huazalingo@gmail.com',
-      pass: 'kkcw ofwd qeon cpvr'
-    },
-    tls: {
-      rejectUnauthorized: false
-    }
-  };
-
-  let nombrePlantel;
-  switch (plantel) {
-    case 1:
-      nombrePlantel = 'Zona 012';
-      break;
-    case 2:
-      nombrePlantel = 'Benito Juárez';
-      break;
-    case 3:
-      nombrePlantel = 'Héroe Agustín';
-      break;
-    default:
-      nombrePlantel = 'No definido';
-      break;
-  }
-  let nombreSesion;
-  switch (sesion) {
-    case 1:
-      nombreSesion = 'Supervisor';
-      break;
-    case 2:
-      nombreSesion = 'Director';
-      break;
-    case 3:
-      nombreSesion = 'Maestro';
-      break;
-  }
-  const mensaje = {
-    from: 'EduZona012 <zona012huazalingo@gmail.com>',
-    to: 'zona012huazalingo@gmail.com',
-    subject: 'Solicitud de registro en EduZona012',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #00314A; padding: 20px;">
-          <img src="https://eduzona.com.mx/logo.png" alt="EduZona012 Logo" style="max-width: 100px; max-height: 100px;">
-        </div>
-        <div style="background-color: #fff; padding: 20px;">
-          <h3 style="margin-bottom: 20px;">Se ha recibido una nueva solicitud de registro que está pendiente de revisión:</h3>
-          <ul>
-            <li><strong>CURP:</strong> ${curp}</li>
-            <li><strong>Plantel:</strong> ${nombrePlantel}</li>
-            <li><strong>Sesión:</strong> ${nombreSesion}</li>
-            <li><strong>Nombre:</strong> ${nombre}</li>
-            <li><strong>Apellido paterno:</strong> ${aPaterno}</li>
-            <li><strong>Apellido materno:</strong> ${aMaterno}</li>
-            <li><strong>Correo:</strong> ${correo}</li>
-          </ul>
-          <p>Para aceptar o rechazar la solicitud, haz clic en el siguiente enlace:</p>
-          <p><a href="https://edu-zona.vercel.app/">Enlace a la página de revisión de solicitudes</a></p>
-        </div>
-        <div style="background-color: #00314A; padding: 20px; text-align: center;">
-          <p style="margin-bottom: 0; color: #fff;">© 2024 EduZona012. Todos los derechos reservados.</p>
-        </div>
-      </div>
-    `
-  };
-  const transport = nodemailer.createTransport(config);
-  const info = await transport.sendMail(mensaje);
-  console.log(info);
-}
-//YAAA
-app.post('/insertar-solicitud', async (req, res) => {
-  let connection;
-  try {
-    const {
-      curp,
-      plantel,
-      sesion,
-      nombre,
-      aPaterno,
-      aMaterno,
-      correo
-    } = req.body;
-    const clave = uuid.v4();
-    connection = await req.mysqlPool.getConnection();
-    const query = `
-      INSERT INTO registrosoli 
-        (curp, plantel, sesion, nombre, aPaterno, aMaterno, correo, clave)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    await connection.execute(query, [curp, plantel, sesion, nombre, aPaterno, aMaterno, correo, clave]);
-    res.status(200).send('Registro exitoso');
-    await enviarMail(curp, plantel, sesion, nombre, aPaterno, aMaterno, correo);
-  } catch (error) {
-    console.error('Error al insertar dato en la base de datos:', error);
-    res.status(500).send('Error al insertar dato en la base de datos');
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-//YAAAA
-app.post('/insertar-dato', async (req, res) => {
-  let connection;
-  try {
-    const {
-      curp,
-      plantel,
-      sesion,
-      nombre,
-      aPaterno,
-      aMaterno,
-      correo,
-      pregunta,
-      respuesta,
-      contrasena
-    } = req.body;
-    connection = await req.mysqlPool.getConnection();
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(contrasena, saltRounds);
-    const hashedRespuesta = await bcrypt.hash(respuesta, saltRounds);
-    const query = `
-      INSERT INTO registro 
-        (curp, plantel, sesion, nombre, aPaterno, aMaterno, correo, pregunta, respuesta, contrasena)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    await connection.execute(query, [curp, plantel, sesion, nombre, aPaterno, aMaterno, correo, pregunta, hashedRespuesta, hashedPassword]);
-    res.status(200).send('Registro exitoso');
-  } catch (error) {
-    console.error('Error al insertar dato en la base de datos:', error);
-    res.status(500).send('Error al insertar dato en la base de datos');
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-//YAAAAAAA
-app.get('/obtener-clave-cifrado', async (req, res) => {
-  let connection;
-  try {
-    const { curp } = req.query;
-    connection = await req.mysqlPool.getConnection();
-    const [rows] = await connection.execute(
-      'SELECT clave FROM registro WHERE curp = ?',
-      [curp]
-    );
-    // Realizar consulta para obtener la clave de cifrado asociada a la CURP
-    if (rows.length > 0) {
-      // Retornar la clave de cifrado
-      const claveCifrado = rows[0].clave;
-      res.status(200).json({ claveCifrado });
-    } else {
-      // Si no se encontraron resultados, enviar un mensaje de error
-      res.status(404).send('No se encontró ninguna clave de cifrado asociada a la CURP proporcionada');
-    }
-  } catch (error) {
-    console.error('Error al obtener clave de cifrado:', error);
-    res.status(500).send('Error al obtener clave de cifrado');
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-//YAAAAAAAAAA
-app.post('/insertar-dato2', async (req, res) => {
-  let connection;
-  try {
-    const { curp, pregunta, respuesta, contrasena } = req.body;
-    connection = await req.mysqlPool.getConnection();
-    // Cifrar la contraseña antes de almacenarla en la base de datos
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(contrasena, saltRounds);
-    const hashedRespuesta = await bcrypt.hash(respuesta, saltRounds);
-    // Verificar si ya existe un registro con la CURP proporcionada
-    const [existingRecord] = await connection.execute('SELECT * FROM registro WHERE curp = ?', [curp]);
-    // Si existe un registro con esa CURP, actualizar los campos
-    if (existingRecord.length > 0) {
-      const query = `
-        UPDATE registro 
-        SET pregunta = ?, respuesta = ?, contrasena = ?
-        WHERE curp = ?
-      `;
-      await connection.execute(query, [pregunta, hashedRespuesta, hashedPassword, curp]);
-      // Actualizar estado_cuenta y estado_usuario a 1
-      const updateEstadoQuery = 'UPDATE registro SET estado_cuenta = 1, estado_usuario = 1 WHERE curp = ?';
-      await connection.execute(updateEstadoQuery, [curp]);
-      res.status(200).send('Actualización exitosa');
-    } else {
-      res.status(400).send('No existe ningún registro con esta CURP');
-    }
-  } catch (error) {
-    console.error('Error al actualizar dato en la base de datos:', error);
-    res.status(500).send('Error al actualizar dato en la base de datos');
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-//YAAAAAAAAAAAAAAAA
-app.post('/login', async (req, res) => {
-  let plantel;
-  let curp;
-  let connection;
-  let ipAddress;
-  let requestedUrl;
-  try {
-    const { curp: curpFromReq, contrasena } = req.body;
-    curp = curpFromReq; // Asignar el valor de la CURP desde el body de la solicitud
-    ipAddress = req.ip.includes('::1') ? '127.0.0.1' : req.ip.replace(/^.*:/, ''); // Extraer la IP del cliente
-    requestedUrl = req.originalUrl; // Obtener la URL solicitada
-    console.log('Datos de inicio de sesión recibidos en el backend:', { curp, ipAddress, requestedUrl }); // Mostrar los datos en consola
-    connection = await req.mysqlPool.getConnection();
-    try {
-
-      const query = 'SELECT * FROM registro WHERE curp = ?';
-      const [results] = await connection.execute(query, [curp]);
-      if (results.length > 0) {
-        const user = results[0];
-        const hashedPassword = user.contrasena;
-        const match = await bcrypt.compare(contrasena, hashedPassword);
-        if (match) {
-          if (user.estado_usuario === 1) {
-            if (user.estado_cuenta === 1) {
-              // Verifica el rol del usuario
-              const userRole = user.sesion;
-              let roleName = '';
-              if (userRole === 1) {
-                roleName = ' 1';
-              } else if (userRole === 2) {
-                roleName = ' 2';
-              } else if (userRole === 3) {
-                roleName = ' 3';
-              } else {
-                roleName = 'Otro Rol';
-              }
-              plantel = user.plantel;
-              app.locals.plantel = plantel;
-              app.locals.curp = curp;
-              app.locals.roleName = roleName;
-              const updateQuery = 'UPDATE registro SET fecha_inicio_sesion = CURRENT_TIMESTAMP WHERE curp = ?';
-              const [updateResult] = await connection.execute(updateQuery, [curp]);
-              console.log(`Se actualizó ${updateResult.affectedRows} fila(s) en la tabla registro.`);
-              console.log(`Inicio de sesión exitoso. Rol: ${roleName}`);
-              console.log('Valor del plantel:', plantel);
-              console.log('Valor de la curp:', curp);
-              // Guardar datos en la tabla logs_iniciosesion
-              const insertQuery = 'INSERT INTO logs_iniciosesion (curp, IP, URLS, HTTP, dia, hora, descripcion) VALUES (?, ?, ?, ?, CURRENT_DATE(), CURRENT_TIME(), ?)';
-              await connection.execute(insertQuery, [curp, ipAddress, requestedUrl, res.statusCode, "Inicio de sesión exitoso"]);
-
-              res.json({ success: true, role: userRole, roleName: roleName, plantel: plantel });
-
-            } else if (user.estado_cuenta === 2) {
-              console.log('Inicio de sesión fallido: La cuenta está bloqueada');
-              // Guardar datos en la tabla logs_iniciosesion
-              const insertQuery = 'INSERT INTO logs_iniciosesion (curp, IP, URLS, HTTP, dia, hora, descripcion) VALUES (?, ?, ?, ?, CURRENT_DATE(), CURRENT_TIME(), ?)';
-              await connection.execute(insertQuery, [curp, ipAddress, requestedUrl, res.statusCode, "Inicio de sesión fallido: La cuenta está bloqueada"]);
-              res.json({ success: false, message: 'La cuenta está bloqueada. Para recuperar su cuenta, restablezca su contraseña.' });
-            }
-          } else if (user.estado_usuario === 2) {
-            console.log('Inicio de sesión fallido: El usuario ha sido dado de baja del sistema');
-            // Guardar datos en la tabla logs_iniciosesion
-            const insertQuery = 'INSERT INTO logs_iniciosesion (curp, IP, URLS, HTTP, dia, hora, descripcion) VALUES (?, ?, ?, ?, CURRENT_DATE(), CURRENT_TIME(), ?)';
-            await connection.execute(insertQuery, [curp, ipAddress, requestedUrl, res.statusCode, "Inicio de sesión fallido: El usuario ha sido dado de baja del sistema"]);
-            res.json({ success: false, message: 'El usuario ha sido dado de baja del sistema' });
-          }
-        } else {
-          console.log('Inicio de sesión fallido: Contraseña incorrecta');
-          // Guardar datos en la tabla logs_iniciosesion
-          const insertQuery = 'INSERT INTO logs_iniciosesion (curp, IP, URLS, HTTP, dia, hora, descripcion) VALUES (?, ?, ?, ?, CURRENT_DATE(), CURRENT_TIME(), ?)';
-          await connection.execute(insertQuery, [curp, ipAddress, requestedUrl, res.statusCode, "Inicio de sesión fallido: Contraseña incorrecta"]);
-          res.json({ success: false, message: 'Contraseña incorrecta' });
-        }
-      } else {
-        console.log('Inicio de sesión fallido: Usuario no encontrado');
-        // Guardar datos en la tabla logs_iniciosesion
-        const insertQuery = 'INSERT INTO logs_iniciosesion (curp, IP, URLS, HTTP, dia, hora, descripcion) VALUES (?, ?, ?, ?, CURRENT_DATE(), CURRENT_TIME(), ?)';
-        await connection.execute(insertQuery, [curp, ipAddress, requestedUrl, res.statusCode, "Inicio de sesión fallido: Usuario no encontrado"]);
-        res.json({ success: false, message: 'La CURP no está registrada' });
-      }
-    } finally {
-      if (connection) {
-        connection.release();
-      }
-    }
-  } catch (error) {
-    console.error('Error al procesar solicitud de inicio de sesión:', error);
-    if (connection) {
-      // Guardar datos en la tabla logs_iniciosesion
-      const insertQuery = 'INSERT INTO logs_iniciosesion (curp, IP, URLS, HTTP, dia, hora, descripcion) VALUES (?, ?, ?, ?, CURRENT_DATE(), CURRENT_TIME(), ?)';
-      await connection.execute(insertQuery, [curp, ipAddress, requestedUrl, res.statusCode, "Error al procesar solicitud de inicio de sesión"]);
-      res.status(500).json({ success: false, message: 'Error al procesar solicitud de inicio de sesión' });
-      connection.release();
-    }
-
-  }
-
-});
+ 
 
 //YAA
 app.get('/docentes_asignacion', async (req, res) => {
@@ -1212,193 +462,8 @@ app.get('/docentes_asignacion', async (req, res) => {
 
 
 
-//YAAA
-app.get('/obtener-correo/:curp', async (req, res) => {
-  let connection;
-  try {
-    const { curp } = req.params;
-    connection = await req.mysqlPool.getConnection();
-    const query = 'SELECT correo FROM registro WHERE curp = ?';
-    const [results] = await connection.execute(query, [curp]);
-    if (results.length > 0) {
-      const { correo } = results[0];
-      res.json({ correo });
-    } else {
-      res.status(404).json({ error: 'No se encontraron datos para la CURP proporcionada' });
-    }
-  } catch (error) {
-    console.error('Error al obtener el correo desde la base de datos:', error);
-    res.status(500).json({ error: 'Error al obtener correo desde la base de datos' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-//YAAAA
-app.get('/obtener-pregunta/:curp', async (req, res) => {
-  let connection;
-  try {
-    const { curp } = req.params;
-    connection = await req.mysqlPool.getConnection();
-    const query = 'SELECT pregunta FROM registro WHERE curp = ?';
-    const [results] = await connection.execute(query, [curp]);
-    if (results.length > 0) {
-      const { pregunta } = results[0];
-      res.json({ pregunta: pregunta });
-    } else {
-      res.status(404).json({ error: 'No se encontraron datos para la CURP proporcionada' });
-    }
-  } catch (error) {
-    console.error('Error al obtener nombre desde la base de datos:', error);
-    res.status(500).json({ error: 'Error al obtener nombre desde la base de datos' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-//YAAAAA
-app.get('/obtener-tipo-pregunta/:pregunta', async (req, res) => {
-  let connection;
-  try {
-    const { pregunta } = req.params;
-    connection = await req.mysqlPool.getConnection();
-    const preguntaQuery = 'SELECT tipo_pregunta FROM pregunta WHERE id = ?'; // Ajusta la consulta según tu esquema de base de datos
-    const [preguntaResults] = await connection.execute(preguntaQuery, [pregunta]);
-    if (preguntaResults.length > 0) {
-      const { tipo_pregunta } = preguntaResults[0];
-      res.json({ tipo_pregunta: tipo_pregunta });
-    } else {
-      res.status(404).json({ error: 'No se encontraron datos para la pregunta proporcionada en la tabla pregunta' });
-    }
-  } catch (error) {
-    console.error('Error al obtener tipo de pregunta desde la base de datos:', error);
-    res.status(500).json({ error: 'Error al obtener tipo de pregunta desde la base de datos' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-//YAAAAAAA
-app.post('/recuperar-contrasena', async (req, res) => {
-  let connection;
-  try {
-    const { curp, respuesta } = req.body;
-    console.log('Datos de recuperación de contraseña:', { curp, respuesta });
-    connection = await req.mysqlPool.getConnection();
-
-    // Verificar la existencia de la CURP y obtener la respuesta almacenada
-    const checkExistenceQuery = 'SELECT respuesta FROM registro WHERE curp = ?';
-    const [existenceResults] = await connection.execute(checkExistenceQuery, [curp]);
-    if (existenceResults.length === 0) {
-      return res.status(404).json({ error: 'La CURP no está registrada' });
-    }
-    const storedRespuesta = existenceResults[0].respuesta;
-
-    // Verificar que la respuesta coincida
-    const matchRespuesta = await bcrypt.compare(respuesta, storedRespuesta);
-    if (!matchRespuesta) {
-      console.log('La respuesta no es correcta');
-      return res.status(401).json({ error: 'La respuesta no es correcta. Por favor, inténtelo de nuevo.' });
-    }
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error al procesar solicitud de recuperación de contraseña:', error);
-    res.status(500).json({ error: 'Error al procesar solicitud de recuperación de contraseña' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-//YAAAA
-app.post('/actualizar-contrasena', async (req, res) => {
-  let connection;
-  try {
-    const { curp, nuevaContrasena } = req.body;
-    const ipAddress = req.ip.includes('::1') ? '127.0.0.1' : req.ip.replace(/^.*:/, ''); // Extraer la IP del cliente
-    console.log('Datos de inicio de sesión recibidos en el backend:', { curp, nuevaContrasena, ipAddress }); // Mostrar los datos en consola
-    connection = await req.mysqlPool.getConnection();
-    try {
-      // Consultar el registro actual para obtener el valor actual de la contraseña
-      const selectQuery = 'SELECT contrasena FROM registro WHERE curp = ?';
-      const [rows] = await connection.execute(selectQuery, [curp]);
-      if (rows.length === 0) {
-        return res.status(404).json({ error: 'No se encontró ningún registro con la CURP proporcionada' });
-      }
-      // Obtener la contraseña actual
-      const contrasenaActual = rows[0].contrasena;
-      // Guardar el valor actual de la contraseña en otro campo (por ejemplo, contrasena_anterior)
-      const updateAnteriorQuery = 'UPDATE registro SET ultima_contrasena = ? WHERE curp = ?';
-      await connection.execute(updateAnteriorQuery, [contrasenaActual, curp]);
-      // Cifrar la nueva contraseña antes de almacenarla en la base de datos
-      const saltRounds = 10;
-      const hashedNuevaContrasena = await bcrypt.hash(nuevaContrasena, saltRounds);
-      // Actualizar la contraseña en el campo correspondiente en la base de datos con la nueva contraseña cifrada
-      const updateQuery = 'UPDATE registro SET contrasena = ? WHERE curp = ?';
-      await connection.execute(updateQuery, [hashedNuevaContrasena, curp]);
-      // Actualizar el estado_cuenta a 1 después de cambiar la contraseña
-      const updateEstadoCuentaQuery = 'UPDATE registro SET estado_cuenta = 1 WHERE curp = ?';
-      await connection.execute(updateEstadoCuentaQuery, [curp]);
-      // Log de depuración
-      console.log('Contraseña actualizada exitosamente.');
-      // Consulta para insertar datos en la tabla logs_CanContra
-      const insertQuery = 'INSERT INTO logs_CanContra (IP, fecha_hora, curp, descripcion) VALUES (?, NOW(), ?, ?)';
-      await connection.execute(insertQuery, [ipAddress, curp, 'Se realizó la recuperación de contraseña mediante correo/pregunta secreta']);
-      // Devolver una respuesta exitosa
-      res.json({ success: true, message: 'Contraseña actualizada exitosamente' });
-    } catch (error) {
-      console.error('Error al procesar solicitud de actualización de contraseña:', error);
-      res.status(500).json({ error: 'Error al procesar solicitud de actualización de contraseña' });
-    }
-  } catch (error) {
-    console.error('Error al procesar solicitud de actualización de contraseña:', error);
-    res.status(500).json({ error: 'Error al procesar solicitud de actualización de contraseña' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
-//YAAAA
-app.post('/verificar-codigo', async (req, res) => {
-  let connection;
-  try {
-    const { curp, token } = req.body;
-    connection = await req.mysqlPool.getConnection();
-    // Consultar el registro actual para obtener el token almacenado
-    const selectQuery = 'SELECT token FROM registro WHERE curp = ?';
-    const [rows] = await connection.execute(selectQuery, [curp]);
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'No se encontró ningún registro con la CURP proporcionada' });
-    }
-    const tokenFromDatabase = rows[0].token;
-    // Verificar si el token proporcionado coincide con el token almacenado en la base de datos
-    if (token === tokenFromDatabase) {
-      // El token proporcionado es válido
-      return res.json({ valid: true });
-    } else {
-      // El token proporcionado no coincide
-      return res.json({ valid: false });
-    }
-  } catch (error) {
-    console.error('Error al procesar solicitud de verificación de código:', error);
-    res.status(500).json({ error: 'Error al procesar solicitud de verificación de código' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
+ 
+ 
 //YAAAAAAAAA
 app.get('/grupo', async (req, res) => {
   let connection; // Declarar la variable de conexión aquí para que esté disponible en el bloque `finally`
@@ -1422,6 +487,7 @@ app.get('/grupo', async (req, res) => {
 });
 
 //YAAAAAAAAA
+/*
 app.get('/grado', async (req, res) => {
   let connection;
   try {
@@ -1442,8 +508,7 @@ app.get('/grado', async (req, res) => {
     }
   }
 });
-
-//YAAAA
+*/
 app.get('/verificar_registros_curp', async (req, res) => {
   let connection;
   try {
@@ -1824,67 +889,7 @@ app.post('/borrar_asignacion', async (req, res) => {
   }
 });
 
-//YAAA
-app.post('/borrar_asignacionAdmin', async (req, res) => {
-  let connection;
-  try {
-    const { curp } = req.body;
-
-    // Mostrar el valor de curp en la consola
-    console.log('Curp recibida:', curp);
-
-    // Obtener datos de la asignación a eliminar
-    const selectAssignSql = 'SELECT id, grado_id, grupo_id FROM asignacion_g WHERE docente_curp = ?';
-    connection = await req.mysqlPool.getConnection();
-    const [rows] = await connection.query(selectAssignSql, [curp]);
-
-    // Si no se encuentra ninguna asignación para la Curp dada, retornar un mensaje de éxito
-    if (rows.length === 0) {
-      console.log(`No se encontraron asignaciones para la Curp ${curp}`);
-      res.json({ success: true, message: 'No se encontraron asignaciones para esta Curp' });
-      return;
-    }
-
-    // Iterar sobre las asignaciones encontradas para realizar las acciones necesarias
-    for (const row of rows) {
-      const { id, grado_id, grupo_id } = row;
-
-      // Vaciar el campo docente_curp en la tabla alumnos
-      const updateAlumnosSql = 'UPDATE alumnos SET docente_curp = NULL WHERE docente_curp = ? AND grado_id = ? AND grupo_id = ?';
-      await connection.query(updateAlumnosSql, [curp, grado_id, grupo_id]);
-
-      // Borrar la asignación de la tabla asignacion_g
-      const deleteSql = 'DELETE FROM asignacion_g WHERE id = ?';
-      await connection.query(deleteSql, [id]);
-      console.log('Asignación borrada correctamente');
-
-      // Obtener datos del docente para enviar el correo de notificación
-      const selectCorreoSql = 'SELECT correo, nombre, plantel FROM registro WHERE curp = ?';
-      const [docenteRows] = await connection.query(selectCorreoSql, [curp]);
-      const { correo, nombre, plantel } = docenteRows[0];
-
-      // Enviar correo de notificación
-      await enviarCorreoBorraAsig(correo, nombre, grupo_id, grado_id, plantel);
-
-      // Obtener la dirección IP del cliente
-      const ipAddress = req.ip.includes('::1') ? '127.0.0.1' : req.ip.replace(/^.*:/, '');
-
-      // Insertar registro de eliminación en la tabla logs_eliasig
-      const insertQuery = 'INSERT INTO logs_eliasig (IP, fecha_hora, curp, descripcion) VALUES (?, NOW(), ?, ?)';
-      await connection.execute(insertQuery, [ipAddress, curp, 'Se eliminó una asignación de grupo y grado a un docente']);
-    }
-
-    res.json({ success: true, message: 'Asignaciones borradas correctamente' });
-  } catch (error) {
-    console.error('Error al borrar la asignación: ', error);
-    res.status(500).json({ success: false, message: 'Error al borrar la asignación' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
+ 
 
 //YAAAAAAAAAAA
 app.post('/verificar-asignacion', async (req, res) => {
@@ -2022,7 +1027,7 @@ app.post('/registrar-alumnos', async (req, res) => {
   res.status(200).send('Datos recibidos correctamente y alumnos registrados en la base de datos');
 });
 
-
+//------------------------------------
 //YAAAAAAAAAAAA
 app.get('/alumnos', async (req, res) => {
   const curp = req.app.locals.curp;
@@ -2847,7 +1852,7 @@ app.get('/ConsultarUnicos/:idAlumno', async (req, res) => {
   }
 });
 
-
+//--------------------------------
 
 app.get('/ConsultarDiscapacifdada/:idAlumno', async (req, res) => {
   const idAlumno = req.params.idAlumno;
@@ -3091,7 +2096,7 @@ app.get('/ObtenerGruGra', async (req, res) => {
 
 
 
-
+////////////-----------
 
 app.get('/consultarActividades', async (req, res) => {
   let connection;
@@ -3135,34 +2140,333 @@ app.get('/consultarActividadesId', async (req, res) => {
  
 
 
-app.post('/guardarAgenda', async (req, res) => {
+ 
+
+
+// Configuración de almacenamiento para Multer
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/'); // Guarda los archivos temporalmente en una carpeta local llamada 'uploads'
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname)); // Nombre de archivo único
+  }
+});
+
+// Ruta para manejar la subida del archivo desde el frontend
+app.post('/subirPdf', upload.single('file'), async (req, res) => {
   let connection;
+  const curp = req.app.locals.curp
+  if (!req.file) {
+    return res.status(400).json({ message: 'No se subió ningún archivo' });
+  }
+  const localFilePath = path.join(__dirname, 'uploads', req.file.filename);
+  const fileContent = fs.readFileSync(localFilePath);
 
   try {
-    const { titulo, descripcion, asignacion, fecha, hora } = req.body;
-    console.log('Datos recibidos para la agenda:', { titulo, descripcion, asignacion, fecha, hora });
+    connection = await pool.getConnection();
 
-    connection = await req.mysqlPool.getConnection();
-    const query ='INSERT INTO agenda ( titulo, descripcion, tipo_asig, fecha_sol, hora_sol, fecha_creacion) VALUES (?,?,?,?,?, NOW())'; 
+    // Insertar archivo en la tabla evidenciasPDF
+    await connection.query("INSERT INTO evidenciasPDF (id_agenda, pdf, curp) VALUES (?, ?, ?)", [req.body.actividadId, fileContent, curp]);
+    console.log('Archivo PDF subido exitosamente a la tabla evidenciasPDF');
 
-    
-    await connection.query(query, [titulo, descripcion, asignacion, fecha, hora]);
-    console.log('Datos insertados correctamente a la agenda'); 
-    res.json({ success: true, message: 'Datos insertados correctamente a la agenda' });
+    // Borrar el archivo temporal después de subirlo a la base de datos
+    fs.unlinkSync(localFilePath);
+
+    res.json({ message: 'Archivo PDF subido exitosamente' });
   } catch (error) {
-    console.error('Error al procesar la solicitud: ', error);
-    res.status(500).json({ success: false, message: 'Error al procesar la solicitud' });
+    console.error('Error al subir el archivo PDF a la tabla evidenciasPDF:', error);
+    res.status(500).json({ message: 'Error al subir el archivo PDF' });
   } finally {
     if (connection) {
-      connection.release(); 
+      connection.release(); // Liberar la conexión
     }
   }
 });
 
 
 
+app.get('/verificarExistencia/:actividadId', async (req, res) => {
+  const actividadId = req.params.actividadId;
+  const curp = req.app.locals.curp
+  let connection;
+  try {
+    connection = await pool.getConnection();
+
+    // Consultar si existe un registro con el id_agenda y curp dados
+    const query = "SELECT COUNT(*) AS count FROM evidenciasPDF WHERE id_agenda = ? AND curp = ?";
+    const [rows] = await connection.query(query, [actividadId, curp]);
+
+    // Devolver true si hay al menos un registro
+    res.json({ existe: rows[0].count > 0 });
+  } catch (error) {
+    console.error('Error al verificar la existencia en evidenciasPDF:', error);
+    res.status(500).json({ error: 'Error al verificar la existencia' });
+  } finally {
+    if (connection) {
+      connection.release(); // Liberar la conexión
+    }
+  }
+});
+
+
+
+app.get('/ConcultarevidenciasPDF', async (req, res) => {
+  let connection;
+  const curp = req.app.locals.curp;
+  try {
+    // Consulta SQL con JOIN para obtener la descripción de la agenda
+    const query = `
+      SELECT 
+        e.id,
+        e.id_agenda,
+        a.descripcion AS descripcion_agenda
+      FROM 
+        evidenciasPDF e
+      JOIN 
+        agenda a ON e.id_agenda = a.id
+      WHERE 
+        e.curp = ?
+    `;
+    connection = await req.mysqlPool.getConnection();
+    const [results] = await connection.execute(query, [curp]);
+    res.json(results);
+  } catch (error) {
+    console.error('Error al obtener actividades:', error);
+    res.status(500).json({ error: 'Error al obtener actividades' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
+app.delete('/eliminarEvidencia/:id', async (req, res) => {
+  let connection;
+  const { id } = req.params;
+  try {
+    const query = 'DELETE FROM evidenciasPDF WHERE id = ?';
+    connection = await req.mysqlPool.getConnection();
+    await connection.execute(query, [id]);
+    res.json({ message: 'Actividad eliminada correctamente' });
+  } catch (error) {
+    console.error('Error al eliminar actividad:', error);
+    res.status(500).json({ error: 'Error al eliminar actividad' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
+
+app.put('/editarEvidencia/:id', upload.single('file'), async (req, res) => {
+  let connection;
+  const { id } = req.params;
+  if (!req.file) {
+    return res.status(400).json({ message: 'No se subió ningún archivo' });
+  }
+  const localFilePath = path.join(__dirname, 'uploads', req.file.filename);
+  const fileContent = fs.readFileSync(localFilePath);
+
+  try {
+    connection = await req.mysqlPool.getConnection();
+
+    // Actualizar archivo en la tabla evidenciasPDF
+    const query = 'UPDATE evidenciasPDF SET pdf = ? WHERE id = ?';
+    await connection.execute(query, [fileContent, id]);
+
+    // Borrar el archivo temporal después de subirlo a la base de datos
+    fs.unlinkSync(localFilePath);
+
+    res.json({ message: 'Archivo PDF actualizado correctamente' });
+  } catch (error) {
+    console.error('Error al actualizar el archivo PDF en la tabla evidenciasPDF:', error);
+    res.status(500).json({ message: 'Error al actualizar el archivo PDF' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
+app.get('/descargarEvidencia/:id', async (req, res) => {
+  let connection;
+  const { id } = req.params;
+  try {
+    connection = await req.mysqlPool.getConnection();
+    const [rows] = await connection.execute('SELECT pdf FROM evidenciasPDF WHERE id = ?', [id]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Evidencia no encontrada' });
+    }
+
+    const pdfBuffer = rows[0].pdf;
+
+    res.setHeader('Content-Disposition', `attachment; filename=evidencia_${id}.pdf`);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error al descargar evidencia:', error);
+    res.status(500).json({ message: 'Error al descargar evidencia' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+ 
+
+
+app.post('/guardar-rezago-academico', async (req, res) => {
+  let connection;
+  const {
+    idAlumnos, 
+    leer,
+    escribir,
+    habilidad,
+    participacion,
+    comportamiento
+  } = req.body;
+
+  try {
+    // Establecer conexión desde el pool
+    connection = await pool.getConnection();
+
+    // Consulta SQL para insertar todos los datos en la tabla rezagoAlumno
+    const query = `
+      INSERT INTO rezagoAlumno (idAlumnos, habilidad_lectura, habilidad_escritura, habilidad_matematica, participacion, comportamiento)
+      VALUES (?, ?, ?, ?, ?, ?)`;
+
+    // Ejecutar la consulta SQL con los parámetros proporcionados
+    await connection.execute(query, [idAlumnos, leer, escribir, habilidad, participacion, comportamiento]);
+
+    // Enviar respuesta de éxito al cliente
+    res.status(200).json({ message: 'Datos de rezago académico guardados correctamente' });
+
+  } catch (error) {
+    // Manejo de errores
+    console.error('Error al guardar datos de rezago académico:', error);
+    res.status(500).json({ error: 'Error al guardar datos de rezago académico' });
+
+  } finally {
+    // Liberar la conexión al pool, independientemente del resultado
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
+
+
+ 
+app.get('/rezagoAlumno', async (req, res) => {
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    const [rezagoRows] = await connection.execute(`
+      SELECT *
+      FROM rezagoAlumno
+    `);
+    if (rezagoRows.length === 0) {
+      return res.status(404).json({ error: 'No se encontraron datos en la tabla rezagoAlumno' });
+    } 
+    res.json(rezagoRows);
+  } catch (error) {
+    console.error('Error en la consulta SQL:', error);
+    res.status(500).json({ error: 'Error en la consulta SQL' });
+  } finally { 
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
+app.get('/verificar-rezago/:idAlumnos', async (req, res) => {
+  let connection;
+  const { idAlumnos } = req.params;
+
+  try {
+    connection = await pool.getConnection();
+    const query = `
+      SELECT * FROM rezagoAlumno WHERE idAlumnos = ?`;
+    const [result] = await connection.execute(query, [idAlumnos]);
+
+    if (result.length > 0) {
+      return res.status(200).json({ existe: true });
+    }
+
+    res.status(200).json({ existe: false });
+
+  } catch (error) {
+    console.error('Error en la consulta SQL:', error);
+    res.status(500).json({ error: 'Error al verificar el registro de rezago académico' });
+
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
+app.put('/rezagoAlumno/:idAlumnos', async (req, res) => {
+  let connection;
+  const { idAlumnos } = req.params;
+  const { habilidad_lectura, habilidad_escritura, habilidad_matematica, participacion, comportamiento } = req.body;
+
+  try {
+    connection = await pool.getConnection();
+
+    const query = `
+      UPDATE rezagoAlumno
+      SET habilidad_lectura = ?, habilidad_escritura = ?, habilidad_matematica = ?, participacion = ?, comportamiento = ?
+      WHERE idAlumnos = ?`;
+
+    await connection.execute(query, [habilidad_lectura, habilidad_escritura, habilidad_matematica, participacion, comportamiento, idAlumnos]);
+
+    res.status(200).json({ message: 'Registro actualizado correctamente' });
+
+  } catch (error) {
+    console.error('Error al actualizar el registro:', error);
+    res.status(500).json({ error: 'Error al actualizar el registro' });
+
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
+
+app.delete('/rezagoAlumno/:idAlumnos', async (req, res) => {
+  let connection;
+  const { idAlumnos } = req.params;
+
+  try {
+    connection = await pool.getConnection();
+
+    const query = `DELETE FROM rezagoAlumno WHERE idAlumnos = ?`;
+
+    await connection.execute(query, [idAlumnos]);
+
+    res.status(200).json({ message: 'Registro eliminado correctamente' });
+
+  } catch (error) {
+    console.error('Error al eliminar el registro:', error);
+    res.status(500).json({ error: 'Error al eliminar el registro' });
+
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
 // Iniciar el servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor en ejecución en el puerto ${PORT}`);
 });
+
+//3126
