@@ -7,7 +7,7 @@ const mysql = require('mysql2/promise');
 const app = express();
 
 const routes = require('./routes');
-
+     
 app.use(cors());
 app.use(express.json());
 app.use(bodyParser.json());
