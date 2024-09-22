@@ -22,7 +22,7 @@ app.use(helmet());
 const moment = require('moment'); 
 const routes = require('./routes');  
 
-
+//rutas de las apis
 const inicioSesion = require('./apis/inicioSesion'); 
 const RecuperarContrasena = require('./apis/RecuperarContrasena'); 
 const PreRegistro = require('./apis/PreRegistro'); 
