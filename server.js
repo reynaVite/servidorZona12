@@ -23,15 +23,15 @@ const moment = require('moment');
 const routes = require('./routes');  
 
 
-const inicioSesion = require('./inicioSesion'); 
-const RecuperarContrasena = require('./RecuperarContrasena'); 
-const PreRegistro = require('./PreRegistro'); 
-const RegistroFinal = require('./RegistroFinal');
-const usuariosAdmin = require('./usuariosAdmin');
-const AsignarAgenda = require('./AsignarAgenda');
-const AgendaEntregados = require('./AgendaEntregados');
-const ExamenElaboracion = require('./ExamenElaboracion'); 
-const Foro = require('./Foro'); 
+const inicioSesion = require('./apis/inicioSesion'); 
+const RecuperarContrasena = require('./apis/RecuperarContrasena'); 
+const PreRegistro = require('./apis/PreRegistro'); 
+const RegistroFinal = require('./apis/RegistroFinal');
+const usuariosAdmin = require('./apis/usuariosAdmin');
+const AsignarAgenda = require('./apis/AsignarAgenda');
+const AgendaEntregados = require('./apis/AgendaEntregados');
+const ExamenElaboracion = require('./apis/ExamenElaboracion'); 
+const Foro = require('./apis/Foro'); 
 
 //Política de CSP: Solo scripts internos
 app.use(

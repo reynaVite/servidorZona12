@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
 const inicioSesion = express.Router(); 
 
-// Ruta para inicio de sesión
+// Ruta para inicio de sesi
 inicioSesion.post('/login', async (req, res) => {
     let connection;
     try {
