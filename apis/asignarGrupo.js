@@ -6,37 +6,36 @@ const nodemailer = require('nodemailer');
 
 
 asignarGrupo.get('/grupogradoDispo', async (req, res) => {
-  let connection;
+    let connection;
 
-  try {
-      const plantel = req.app.locals.plantel; // Acceso global a plantel
-      console.log('Plantel recibido en grupogradoDispo:', plantel);
+    try {
+        const plantel = req.query.plantel; // Obtener el plantel del query params
+        console.log('Plantel recibido en grupogradoDispo:', plantel);
 
-      if (!plantel) {
-          return res.status(400).json({ error: 'Plantel no definido' });
-      }
+        if (!plantel) {
+            return res.status(400).json({ error: 'Plantel no definido' });
+        }
 
-      const query = 'SELECT grado_id, grupo_id FROM alumnos WHERE plantel_id = ? AND docente_curp IS NULL';
-      connection = await req.mysqlPool.getConnection();
-      const [results] = await connection.execute(query, [plantel]);
+        const query = 'SELECT grado_id, grupo_id FROM alumnos WHERE plantel_id = ? AND docente_curp IS NULL';
+        connection = await req.mysqlPool.getConnection();
+        const [results] = await connection.execute(query, [plantel]);
 
-      const options = results.map(result => ({
-          grado_id: result.grado_id,
-          grupo_id: result.grupo_id
-      }));
+        const options = results.map(result => ({
+            grado_id: result.grado_id,
+            grupo_id: result.grupo_id
+        }));
 
-      console.log('Grupos y grados obtenidos:', options);
-      res.json(options);
-  } catch (error) {
-      console.error('Error al obtener los grupos y grados disponibles:', error);
-      res.status(500).json({ error: 'Error interno del servidor' });
-  } finally {
-      if (connection) {
-          connection.release();
-      }
-  }
+        console.log('Grupos y grados obtenidos:', options);
+        res.json(options);
+    } catch (error) {
+        console.error('Error al obtener los grupos y grados disponibles:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
+    }
 });
-
 
 
   asignarGrupo.get('/grado', async (req, res) => {

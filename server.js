@@ -29,10 +29,13 @@ const PreRegistro = require('./apis/PreRegistro');
 const RegistroFinal = require('./apis/RegistroFinal');
 const usuariosAdmin = require('./apis/usuariosAdmin');
 const AsignarAgenda = require('./apis/AsignarAgenda');
-const AgendaEntregados = require('./apis/AgendaEntregados');
+const AgendaEntregados = require('./AgendaEntregados');
 const ExamenElaboracion = require('./apis/ExamenElaboracion'); 
 const Foro = require('./Foro'); 
 const asignarGrupo  = require('./apis/asignarGrupo');
+const consultarAgenda = require('./apis/agenda')
+
+
 
 //Política de CSP: Solo scripts internos
 app.use(
@@ -93,6 +96,9 @@ app.use(AgendaEntregados);
 app.use(ExamenElaboracion);
 app.use(Foro);
 app.use(asignarGrupo);
+app.use(consultarAgenda);
+
+
 
 
 app.get('/conexionBaseDatos', async (req, res) => {
@@ -1818,102 +1824,6 @@ app.get('/consultarActividades', async (req, res) => {
     }
   }
 });
-
-
-
-app.get('/consultarActividadesId', async (req, res) => {
-  const roleName = req.app.locals.roleName;
-
-  let connection;
-  console.log('user', roleName);
-  try {
-    const query = 'SELECT * FROM agenda WHERE tipo_asig = ?';
-    connection = await req.mysqlPool.getConnection();
-    const [results] = await connection.execute(query, [roleName]);
-    res.json(results);
-  } catch (error) {
-    console.error('Error al obtener actividades:', error);
-    res.status(500).json({ error: 'Error al obtener actividades' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-});
-
- 
-
-
- 
-
-
-// Configuración de almacenamiento para Multer
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/'); // Guarda los archivos temporalmente en una carpeta local llamada 'uploads'
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname)); // Nombre de archivo único
-  }
-});
-
-// Ruta para manejar la subida del archivo desde el frontend
-app.post('/subirPdf', upload.single('file'), async (req, res) => {
-  let connection;
-  const curp = req.app.locals.curp
-  if (!req.file) {
-    return res.status(400).json({ message: 'No se subió ningún archivo' });
-  }
-  const localFilePath = path.join(__dirname, 'uploads', req.file.filename);
-  const fileContent = fs.readFileSync(localFilePath);
-
-  try {
-    connection = await pool.getConnection();
-
-    // Insertar archivo en la tabla evidenciasPDF
-    await connection.query("INSERT INTO evidenciasPDF (id_agenda, pdf, curp) VALUES (?, ?, ?)", [req.body.actividadId, fileContent, curp]);
-    console.log('Archivo PDF subido exitosamente a la tabla evidenciasPDF');
-
-    // Borrar el archivo temporal después de subirlo a la base de datos
-    fs.unlinkSync(localFilePath);
-
-    res.json({ message: 'Archivo PDF subido exitosamente' });
-  } catch (error) {
-    console.error('Error al subir el archivo PDF a la tabla evidenciasPDF:', error);
-    res.status(500).json({ message: 'Error al subir el archivo PDF' });
-  } finally {
-    if (connection) {
-      connection.release(); // Liberar la conexión
-    }
-  }
-});
-
-
-
-app.get('/verificarExistencia/:actividadId', async (req, res) => {
-  const actividadId = req.params.actividadId;
-  const curp = req.app.locals.curp
-  let connection;
-  try {
-    connection = await pool.getConnection();
-
-    // Consultar si existe un registro con el id_agenda y curp dados
-    const query = "SELECT COUNT(*) AS count FROM evidenciasPDF WHERE id_agenda = ? AND curp = ?";
-    const [rows] = await connection.query(query, [actividadId, curp]);
-
-    // Devolver true si hay al menos un registro
-    res.json({ existe: rows[0].count > 0 });
-  } catch (error) {
-    console.error('Error al verificar la existencia en evidenciasPDF:', error);
-    res.status(500).json({ error: 'Error al verificar la existencia' });
-  } finally {
-    if (connection) {
-      connection.release(); // Liberar la conexión
-    }
-  }
-});
-
 
 
 app.get('/ConcultarevidenciasPDF', async (req, res) => {
