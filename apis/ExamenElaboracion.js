@@ -40,13 +40,12 @@ const upload = multer({ storage: storage });
 
 ExamenElaboracion.post('/submitExamen', upload.single('file'), async (req, res) => {
   let connection;
-  //const curp = req.app.locals.curp || 'CURP no disponible';
   const now = new Date();
   const fecha = now.toISOString().split('T')[0]; // YYYY-MM-DD
   const hora = now.toTimeString().split(' ')[0]; // HH:MM:SS
-  const { opcion, descripcion } = req.body;
+  const { opcion, descripcion, curp } = req.body; // Agregar 'curp' aquí
 
- //console.log('CURP:', curp);
+  console.log('CURP:', curp); // Mostrar CURP en consola
   console.log('Fecha:', fecha);
   console.log('Hora:', hora);
   console.log('Opción:', opcion);
@@ -59,7 +58,6 @@ ExamenElaboracion.post('/submitExamen', upload.single('file'), async (req, res) 
   }
 
   const filePath = path.join('uploads', req.file.originalname); // Ruta completa del archivo
-
   console.log('Archivo recibido:', req.file.originalname);
   console.log('Ruta del archivo:', filePath);
 
@@ -78,25 +76,42 @@ ExamenElaboracion.post('/submitExamen', upload.single('file'), async (req, res) 
     return res.status(500).json({ message: 'Error al procesar el archivo' });
   }
 
-  try { 
+  try {
     connection = await req.mysqlPool.getConnection();
-    console.log('Conexión a la base de datos establecida.'); 
-    await connection.query(
-      "INSERT INTO examen ( hora, fecha, materia, pdf, descripcion) VALUES (?, ?, ?, ?, ?)",
-      [ hora, fecha, opcion, filePath, descripcion]
+    console.log('Conexión a la base de datos establecida.');
+
+    // Realizar la consulta para obtener el ID correspondiente al CURP
+    const [rows] = await connection.query(
+      "SELECT id FROM asignacion_g WHERE docente_curp = ?",
+      [curp]
     );
 
-    console.log('Ruta del archivo PDF subida exitosamente a la tabla examen:', filePath);
+    if (rows.length > 0) {
+      const id = rows[0].id; // Obtener el primer ID
+      console.log('ID encontrado en asignacion_g:', id);
 
-    res.json({ message: 'Ruta del archivo PDF subida exitosamente', filePath });
+      // Ahora puedes continuar con la inserción en la tabla examen
+      await connection.query(
+        "INSERT INTO examen (hora, fecha, materia, pdf, descripcion, id_docente) VALUES (?, ?, ?, ?, ?, ?)",
+        [hora, fecha, opcion, filePath, descripcion, id] // Cambiar a 6 parámetros
+      );
+
+      console.log('Ruta del archivo PDF subida exitosamente a la tabla examen:', filePath);
+      res.json({ message: 'Ruta del archivo PDF subida exitosamente', filePath });
+    } else {
+      console.log('No se encontró el CURP en asignacion_g');
+      res.status(404).json({ message: 'CURP no encontrado en asignacion_g' });
+    }
+
   } catch (error) {
-    console.error('Error al subir la ruta del archivo PDF a la tabla examen:', error);
-    res.status(500).json({ message: 'Error al subir la ruta del archivo PDF' });
+    console.error('Error al procesar la solicitud:', error);
+    res.status(500).json({ message: 'Error al procesar la solicitud' });
   } finally {
     if (connection) {
-      connection.release(); 
+      connection.release();
     }
   }
 });
+
 
 module.exports = ExamenElaboracion;
