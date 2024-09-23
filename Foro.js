@@ -4,25 +4,31 @@ const Foro = express.Router();
 const path = require('path');
 
 Foro.get('/consultarMaterias', async (req, res) => {
-    let connection;
-    try {
-      const query = `
-        SELECT e.id, e.id_docente, e.hora, e.fecha, m.nombre AS materia, e.pdf, e.descripcion
-        FROM examen e
-        JOIN materias m ON e.materia = m.id
-      `;
-      connection = await req.mysqlPool.getConnection();
-      const [results] = await connection.execute(query);
-      res.json(results);
-    } catch (error) {
-      console.error('Error al obtener datos:', error);
-      res.status(500).json({ error: 'Error al obtener datos' });
-    } finally {
-      if (connection) {
-        connection.release();
-      }
+  let connection;
+  try {
+    const query = `
+      SELECT e.id, e.id_docente, e.hora, e.fecha, m.nombre AS materia, e.pdf, e.descripcion, a.docente_curp
+      FROM examen e
+      JOIN materias m ON e.materia = m.id
+      JOIN asignacion_g a ON e.id_docente = a.id
+    `;
+    connection = await req.mysqlPool.getConnection();
+    const [results] = await connection.execute(query);
+    
+    // Imprimir resultados en consola
+    console.log('Resultados obtenidos:', results);
+
+    res.json(results);
+  } catch (error) {
+    console.error('Error al obtener datos:', error);
+    res.status(500).json({ error: 'Error al obtener datos' });
+  } finally {
+    if (connection) {
+      connection.release();
     }
-  });
+  }
+});
+
 
 Foro.get('/foro', async (req, res) => {
     let connection;
@@ -81,28 +87,28 @@ Foro.get('/getPdf', async (req, res) => {
     }
   });
   
-  Foro.post('/guardarForo', async (req, res) => {
-    let connection;
-    const curp = req.app.locals.curp;
-  
-    try {
-      const { id, opinion, fecha, hora } = req.body;
-  
-      console.log('Datos recibidos para el foro:', {  id, opinion, fecha, hora });
-      connection = await req.mysqlPool.getConnection();
-      const query ='INSERT INTO foro ( id_examen, curp, opinion, fecha, hora) VALUES (?,?,?,?,?)'; 
-      await connection.query(query, [ id, curp, opinion, fecha, hora]);
-      console.log('Datos insertados correctamente al foro'); 
-      res.json({ success: true, message: 'Datos insertados correctamente al foro' });
-    } catch (error) {
-      console.error('Error al procesar la solicitud: ', error);
-      res.status(500).json({ success: false, message: 'Error al procesar la solicitud' });
-    } finally {
-      if (connection) {
-        connection.release(); 
-      }
+ Foro.post('/guardarForo', async (req, res) => {
+  let connection;
+
+  try {
+    const { id, opinion, fecha, hora,   curp } = req.body; // Incluye docente_curp aquí
+
+    console.log('Datos recibidos para el foro:', { id, opinion, fecha, hora, curp});
+    connection = await req.mysqlPool.getConnection();
+    const query = 'INSERT INTO foro (id_examen, curp, opinion, fecha, hora) VALUES (?,?,?,?,?)'; 
+    await connection.query(query, [id, curp, opinion, fecha, hora]); // Usa docente_curp aquí
+    console.log('Datos insertados correctamente al foro'); 
+    res.json({ success: true, message: 'Datos insertados correctamente al foro' });
+  } catch (error) {
+    console.error('Error al procesar la solicitud: ', error);
+    res.status(500).json({ success: false, message: 'Error al procesar la solicitud' });
+  } finally {
+    if (connection) {
+      connection.release(); 
     }
-  });
+  }
+});
+
 
 Foro.delete('/eliminarComentario/:id', async (req, res) => {
     let connection;
