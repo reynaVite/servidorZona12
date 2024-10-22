@@ -110,7 +110,7 @@ app.use(CambiosEvidencia);
 app.use(RezagoAcademico);
 app.use(express.json());
 
-app.get('/conexionBaseDatos', async (req, res) => {
+app.get('/', async (req, res) => {
   try {
     const connection = await req.mysqlPool.getConnection();
     console.log('Conexión exitosa a la base de datos');
