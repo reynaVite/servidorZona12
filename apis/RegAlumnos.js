@@ -1,7 +1,8 @@
 const express = require('express');
 const RegAlumnos = express.Router();
 const nodemailer = require('nodemailer');
-
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' },{ storage: multer.memoryStorage() });
 
 RegAlumnos.post('/verificar-asignacion', async (req, res) => {
     let connection;
