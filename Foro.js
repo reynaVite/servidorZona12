@@ -49,8 +49,9 @@ Foro.get('/foro', async (req, res) => {
     }
   });
 
-Foro.get('/getPdf', async (req, res) => {
-    const { id } = req.query; // Obtén el id desde los parámetros de consulta
+
+  Foro.get('/getPdf', async (req, res) => {
+    const { id } = req.query;
   
     if (!id) {
       return res.status(400).json({ error: 'Falta el parámetro id' });
@@ -60,23 +61,17 @@ Foro.get('/getPdf', async (req, res) => {
     try {
       connection = await req.mysqlPool.getConnection();
   
-      const query = `
-        SELECT pdf
-        FROM examen
-        WHERE id = ?
-      `;
-  
+      const query = `SELECT pdf FROM examen WHERE id = ?`;
       const [rows] = await connection.execute(query, [id]);
   
       if (rows.length === 0) {
         return res.status(404).json({ error: 'PDF no encontrado' });
       }
   
-      const pdfPath = rows[0].pdf;
+      const pdfUrl = rows[0].pdf;
   
-      // Enviar el archivo PDF
-      const fullPath = path.join(__dirname, pdfPath); // Asegúrate de tener el path correcto
-      res.sendFile(fullPath);
+      // En lugar de enviar el archivo directamente, puedes devolver la URL del PDF
+      res.json({ pdfUrl });
     } catch (error) {
       console.error('Error al obtener el PDF:', error);
       res.status(500).json({ error: 'Error al obtener el PDF' });
@@ -86,6 +81,7 @@ Foro.get('/getPdf', async (req, res) => {
       }
     }
   });
+  
   
  Foro.post('/guardarForo', async (req, res) => {
   let connection;

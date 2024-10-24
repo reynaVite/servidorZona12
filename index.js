@@ -43,17 +43,9 @@ const CambiosEvidencia = require('./apis/CambiosEvidencia')
 const RezagoAcademico= require('./apis/RezagoAcademico')
 const admin = require('./apis/firebaseAdmin')
 
-//Política de CSP: Solo scripts internos
-app.use(
-  helmet.contentSecurityPolicy({
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "https://www.gstatic.com"],
-    },
-  })
-);
+app.use(cors());
 
- 
+
 const pool = mysql.createPool({
   host: 'srv1578.hstgr.io',
   user: 'u549185319_eduzona',

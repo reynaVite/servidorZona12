@@ -1,10 +1,5 @@
 const express = require('express');
-const ExamenElaboracion = express.Router(); 
-const multer = require('multer'); 
-const path = require('path');  
-const { fromBuffer } = require('file-type');
-const fs = require('fs');
-
+const ExamenElaboracion = express.Router();   
 //obtener materias 
 ExamenElaboracion.get('/getMaterias', async (req, res) => {
     let connection;
@@ -28,76 +23,42 @@ ExamenElaboracion.get('/getMaterias', async (req, res) => {
     }
   });
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads'); // Carpeta donde se guardarán los archivos
-  },
-  filename: function (req, file, cb) {
-    cb(null, file.originalname); // Usa el nombre original del archivo
-  }
-});
-const upload = multer({ storage: storage });
-
-ExamenElaboracion.post('/submitExamen', upload.single('file'), async (req, res) => {
+ 
+ExamenElaboracion.post('/submitExamen', async (req, res) => {
   let connection;
   const now = new Date();
   const fecha = now.toISOString().split('T')[0]; // YYYY-MM-DD
   const hora = now.toTimeString().split(' ')[0]; // HH:MM:SS
-  const { opcion, descripcion, curp } = req.body; // Agregar 'curp' aquí
+  const { opcion, descripcion, curp, pdfUrl } = req.body; // Recibir el 'pdfUrl' del frontend
 
-  console.log('CURP:', curp); // Mostrar CURP en consola
+  console.log('CURP:', curp);
   console.log('Fecha:', fecha);
   console.log('Hora:', hora);
   console.log('Opción:', opcion);
   console.log('Descripción:', descripcion);
-
-  // Verificar si se subió un archivo
-  if (!req.file) {
-    console.log('No se subió ningún archivo');
-    return res.status(400).json({ message: 'No se subió ningún archivo' });
-  }
-
-  const filePath = path.join('uploads', req.file.originalname); // Ruta completa del archivo
-  console.log('Archivo recibido:', req.file.originalname);
-  console.log('Ruta del archivo:', filePath);
-
-  // Verificar que el archivo sea un PDF
-  try {
-    const fileBuffer = fs.readFileSync(filePath);
-    const type = await fromBuffer(fileBuffer);
-    if (!type || type.ext !== 'pdf') {
-      console.log('El archivo no es un PDF. Tipo de archivo:', type ? type.ext : 'desconocido');
-      fs.unlinkSync(filePath); // Eliminar el archivo si no es PDF
-      return res.status(400).json({ message: 'El archivo debe ser un PDF' });
-    }
-  } catch (err) {
-    console.error('Error al procesar el archivo:', err);
-    fs.unlinkSync(filePath); // Eliminar el archivo en caso de error
-    return res.status(500).json({ message: 'Error al procesar el archivo' });
-  }
+  console.log('PDF URL:', pdfUrl);
 
   try {
     connection = await req.mysqlPool.getConnection();
     console.log('Conexión a la base de datos establecida.');
 
-    // Realizar la consulta para obtener el ID correspondiente al CURP
+    // Obtener el ID correspondiente al CURP
     const [rows] = await connection.query(
       "SELECT id FROM asignacion_g WHERE docente_curp = ?",
       [curp]
     );
 
     if (rows.length > 0) {
-      const id = rows[0].id; // Obtener el primer ID
-      console.log('ID encontrado en asignacion_g:', id);
+      const id = rows[0].id;
 
-      // Ahora puedes continuar con la inserción en la tabla examen
+      // Insertar en la tabla examen
       await connection.query(
         "INSERT INTO examen (hora, fecha, materia, pdf, descripcion, id_docente) VALUES (?, ?, ?, ?, ?, ?)",
-        [hora, fecha, opcion, filePath, descripcion, id] // Cambiar a 6 parámetros
+        [hora, fecha, opcion, pdfUrl, descripcion, id]
       );
 
-      console.log('Ruta del archivo PDF subida exitosamente a la tabla examen:', filePath);
-      res.json({ message: 'Ruta del archivo PDF subida exitosamente', filePath });
+      console.log('Examen guardado exitosamente con la URL del PDF:', pdfUrl);
+      res.json({ message: 'Examen guardado exitosamente', pdfUrl });
     } else {
       console.log('No se encontró el CURP en asignacion_g');
       res.status(404).json({ message: 'CURP no encontrado en asignacion_g' });
