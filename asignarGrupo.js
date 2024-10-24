@@ -1,7 +1,6 @@
 const express = require('express');
 const asignarGrupo = express.Router();
-
-const app = express();
+ 
 const nodemailer = require('nodemailer');
 
 

@@ -1,8 +1,7 @@
 const express = require('express');
-const RegistroFinal = express.Router();
-const uuid = require('uuid');
-const bcrypt = require('bcrypt');
-const nodemailer = require('nodemailer');
+const RegistroFinal = express.Router(); 
+const bcrypt = require('bcryptjs');
+
 
 RegistroFinal.get('/preguntas-secretas', async (req, res) => {
   let connection;

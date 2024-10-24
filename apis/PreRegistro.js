@@ -1,7 +1,6 @@
 const express = require('express');
 const PreRegistro = express.Router();
-const uuid = require('uuid');
-const bcrypt = require('bcrypt');
+const uuid = require('uuid'); 
 const nodemailer = require('nodemailer');
 
 PreRegistro.get('/plantel', async (req, res) => {

@@ -1,8 +1,5 @@
 const express = require('express');
-const AsignarAgenda = express.Router();
-const uuid = require('uuid');
-const bcrypt = require('bcrypt');
-const nodemailer = require('nodemailer');
+const AsignarAgenda = express.Router();  
 
 //sesion esta en preRegistro
 

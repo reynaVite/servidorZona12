@@ -1,7 +1,8 @@
 const express = require('express');
 const RecuperarContrasena = express.Router();
-const uuid = require('uuid');
-const bcrypt = require('bcrypt');
+const uuid = require('uuid'); 
+const bcrypt = require('bcryptjs');
+
 const nodemailer = require('nodemailer');
 
 // Ruta para verificar si la curp existe en la bd

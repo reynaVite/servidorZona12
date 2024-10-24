@@ -1,7 +1,5 @@
 const express = require('express');
-const usuariosAdmin = express.Router();
-const uuid = require('uuid');
-const bcrypt = require('bcrypt');
+const usuariosAdmin = express.Router(); 
 const nodemailer = require('nodemailer');
 
 const enviarMailBaja = async (correo, nombre) => {

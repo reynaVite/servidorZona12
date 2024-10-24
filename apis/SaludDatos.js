@@ -1,7 +1,6 @@
 const express = require('express');
 const SaludDatos = express.Router();
-const app = express();
-const nodemailer = require('nodemailer');
+const app = express(); 
 
 SaludDatos.get('/saludAlum', async (req, res) => {
     let connection;

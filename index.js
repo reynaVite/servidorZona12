@@ -1,23 +1,15 @@
 const express = require('express');
-const helmet = require('helmet'); 
-const path = require('path'); 
+const helmet = require('helmet');   
 const fs = require('fs');
-const util = require('util'); 
-const bcrypt = require('bcrypt');
+const util = require('util');  
 const cors = require('cors');
-const mysql = require('mysql2/promise');
-const nodemailer = require('nodemailer');
-const jwt = require('jsonwebtoken');
-const bodyParser = require('body-parser');
-const uuid = require('uuid');
-const { Typography } = require('antd');
-const { Paragraph } = Typography;
+const mysql = require('mysql2/promise');  
+const bodyParser = require('body-parser');  
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(bodyParser.json());
-app.use(helmet());
-const moment = require('moment'); 
+app.use(helmet()); 
 const routes = require('./routes');  
 
 //rutas de las apis

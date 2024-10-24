@@ -1,7 +1,5 @@
 const express = require('express');
-const CambiosEvidencia = express.Router();
-const app = express();
-const nodemailer = require('nodemailer');
+const CambiosEvidencia = express.Router(); 
  
 
 

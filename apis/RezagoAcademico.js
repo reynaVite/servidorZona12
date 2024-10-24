@@ -1,6 +1,5 @@
 const express = require('express');
-const RezagoAcademico = express.Router();
-const nodemailer = require('nodemailer');
+const RezagoAcademico = express.Router(); 
 
 RezagoAcademico.get('/verificar-rezago/:idAlumnos', async (req, res) => {
     let connection;

@@ -1,7 +1,5 @@
 const express = require('express');
-const Asignados = express.Router();
-const uuid = require('uuid');
-const bcrypt = require('bcrypt');
+const Asignados = express.Router(); 
 const nodemailer = require('nodemailer');
 
  

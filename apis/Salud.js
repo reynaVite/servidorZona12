@@ -1,8 +1,5 @@
 const express = require('express');
-const Misalumnos = express.Router();
-const uuid = require('uuid');
-const bcrypt = require('bcrypt');
-const nodemailer = require('nodemailer');
+const Misalumnos = express.Router(); 
 
 //YAAAAAAAAAAAAA
 app.get('/categoria', async (req, res) => {
