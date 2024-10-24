@@ -11,7 +11,7 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(helmet()); 
 const routes = require('./routes');  
-
+ 
 //rutas de las apis
 const inicioSesion = require('./apis/inicioSesion'); 
 const RecuperarContrasena = require('./apis/RecuperarContrasena'); 
@@ -34,6 +34,9 @@ const RezagoAcademico= require('./apis/RezagoAcademico')
 const admin = require('./apis/firebaseAdmin')
 
 app.use(cors());
+
+// Ruta para manejar el favicon.ico y evitar errores 500
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 
 const pool = mysql.createPool({
@@ -61,7 +64,7 @@ const pool = mysql.createPool({
 */
 
 
-
+ 
 
 module.exports = pool;
 // Middleware para adjuntar el pool de MySQL a cada solicitud
@@ -467,6 +470,7 @@ app.listen(PORT, () => {
   console.log(`Servidor en ejecución en el puerto ${PORT}`);
 });
  
+module.exports = app;
 
 /* Iniciar el servidor
 const PORT = process.env.PORT || 3000;
