@@ -7,7 +7,7 @@ AgendaEntregados.get('/consultarPDF', async (req, res) => {
   try {
     const query = `
       SELECT e.id_agenda, e.curp, e.pdf, e.id, a.titulo
-      FROM evidenciasPDF AS e
+      FROM evidenciaspdf AS e
       INNER JOIN agenda AS a ON e.id_agenda = a.id
     `;
     connection = await req.mysqlPool.getConnection();
@@ -28,7 +28,7 @@ AgendaEntregados.get('/obtenerPDF/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const query = `
-      SELECT pdf FROM evidenciasPDF WHERE id = ?
+      SELECT pdf FROM evidenciaspdf WHERE id = ?
     `;
     connection = await req.mysqlPool.getConnection();
     const [results] = await connection.execute(query, [id]);

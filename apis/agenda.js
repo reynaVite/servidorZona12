@@ -1,6 +1,5 @@
 const express = require('express');
-const consultarAgenda = express.Router();
-const multer = require('multer');
+const consultarAgenda = express.Router(); 
 const path = require('path');
 const { fromBuffer } = require('file-type');
 const fs = require('fs');
@@ -24,46 +23,38 @@ consultarAgenda.get('/consultarActividadesId', async (req, res) => {
     }
 });
 
-const storageAgenda = multer.diskStorage({
-    destination: function (req, file, cb) {
-        const dir = 'agenda';
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true }); // Crea la carpeta de forma recursiva
-        }
-        cb(null, dir); // Carpeta donde se guardarán los archivos
-    },
-    filename: function (req, file, cb) {
-        cb(null, file.originalname); // Usa el nombre original del archivo
-    }
-});
-const uploadAgenda = multer({ storage: storageAgenda });
+ 
 
-consultarAgenda.post('/subirPdf', uploadAgenda.single('file'), async (req, res) => {
+
+consultarAgenda.post('/subirPdf', async (req, res) => {
     let connection;
-    const curp = req.body.curp;
-    if (!req.file) {
-        return res.status(400).json({ message: 'No se subió ningún archivo' });
+    const { curp, actividadId, pdfUrl } = req.body;  // Obtener los datos del cuerpo de la solicitud
+
+    if (!pdfUrl) {
+        return res.status(400).json({ message: 'No se proporcionó la URL del archivo PDF' });
     }
-    const filePath = path.join('agenda', req.file.originalname); // Ruta completa del archivo
+
     try {
-        // Verificar que el archivo sea un PDF
-        const fileBuffer = fs.readFileSync(filePath);
-        const type = await fromBuffer(fileBuffer);
-        if (!type || type.ext !== 'pdf') {
-            fs.unlinkSync(filePath); // Eliminar el archivo si no es PDF
-            return res.status(400).json({ message: 'El archivo debe ser un PDF' });
-        }
         connection = await req.mysqlPool.getConnection();
-        await connection.query("INSERT INTO evidenciasPDF (id_agenda, pdf, curp) VALUES (?, ?, ?)", [req.body.actividadId, filePath, curp]);
+
+        // Guardar la URL del archivo PDF en la base de datos
+        await connection.query(
+            "INSERT INTO evidenciaspdf (id_agenda, pdf, curp) VALUES (?, ?, ?)",
+            [actividadId, pdfUrl, curp]
+        );
+
         res.json({ message: 'Archivo PDF subido exitosamente' });
     } catch (error) {
-        res.status(500).json({ message: 'Error al subir el archivo PDF' });
+        console.error('Error al guardar el archivo en la base de datos:', error);
+        res.status(500).json({ message: 'Error al guardar el archivo en la base de datos' });
     } finally {
         if (connection) {
             connection.release();
         }
     }
 });
+
+
 
 consultarAgenda.get('/verificarExistencia/:actividadId', async (req, res) => {
     const actividadId = req.params.actividadId;
@@ -72,12 +63,12 @@ consultarAgenda.get('/verificarExistencia/:actividadId', async (req, res) => {
     try {
       connection = await req.mysqlPool.getConnection();
       // Consultar si existe un registro con el id_agenda y curp dados
-      const query = "SELECT COUNT(*) AS count FROM evidenciasPDF WHERE id_agenda = ? AND curp = ?";
+      const query = "SELECT COUNT(*) AS count FROM evidenciaspdf WHERE id_agenda = ? AND curp = ?";
       const [rows] = await connection.query(query, [actividadId, curp]);
       // Devolver true si hay al menos un registro
       res.json({ existe: rows[0].count > 0 });
     } catch (error) {
-      console.error('Error al verificar la existencia en evidenciasPDF:', error);
+      console.error('Error al verificar la existencia en evidenciaspdf:', error);
       res.status(500).json({ error: 'Error al verificar la existencia' });
     } finally {
       if (connection) {
