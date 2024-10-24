@@ -1,3 +1,4 @@
+/*
 const express = require('express');
 const RegAlumnos = express.Router();
 const nodemailer = require('nodemailer');
@@ -144,3 +145,5 @@ RegAlumnos.post('/upload', upload.single('file'), (req, res) => {
 });
 
 module.exports = RegAlumnos;
+
+*/

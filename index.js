@@ -1,7 +1,5 @@
 const express = require('express');
-const helmet = require('helmet');
-const multer = require('multer');
-const upload = multer({ dest: 'uploads/' },{ storage: multer.memoryStorage() });
+const helmet = require('helmet'); 
 const path = require('path'); 
 const fs = require('fs');
 const util = require('util'); 
@@ -94,7 +92,7 @@ app.use(Foro);
 app.use(asignarGrupo);
 app.use(consultarAgenda);
 app.use(AdminSol);
-app.use(RegAlumnos);
+//app.use(RegAlumnos);
 app.use(Asignados);
 app.use(Misalumnos);
 app.use(SaludDatos);
